@@ -1,8 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-    //id("com.android.application")
-    id("com.google.gms.google-services")
+    id("com.google.gms.google-services") // Adicione este plugin aqui
 }
 
 android {
@@ -12,7 +11,7 @@ android {
     defaultConfig {
         applicationId = "com.example.loginscreenv3"
         minSdk = 32
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -53,6 +52,7 @@ android {
 
 dependencies {
 
+    // Dependências gerais
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -64,18 +64,22 @@ dependencies {
     implementation(libs.androidx.navigation.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.navigation.compose.v280)
-    implementation(platform(libs.firebase.bom))
+
+    // Firebase
+    implementation(platform(libs.firebase.bom)) // Declaração única do BOM
     implementation(libs.firebase.auth)
     implementation(libs.firebase.common.ktx)
     implementation(libs.firebase.firestore.ktx)
-    implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+
+    // Testes
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
+    // Debug
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
 }
