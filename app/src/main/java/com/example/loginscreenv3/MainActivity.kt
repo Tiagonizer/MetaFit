@@ -57,7 +57,7 @@ fun MyApp() {
             }
 
             composable("DesafioScreen") {
-                IconScreen(navController = navController) // Tela de desafios
+                DesafioScreen(navController = navController) // Tela de desafios
             }
 
             composable("DisplayAvatarScreen") {
