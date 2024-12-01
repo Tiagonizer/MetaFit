@@ -91,10 +91,15 @@ fun LoginScreen(navController: NavController) {
 
             // Botões "Entrar" e "Cadastrar-se"
             Row(modifier = Modifier.padding(10.dp)) {
-                Button(onClick = { navController.navigate("DesafioScreen") }) {
-                    Text(text = "Entrar")
-                }
 
+                Button(onClick = {
+                if(textFieldUsuario.isBlank() &&textFieldSenha.isBlank()){
+                Toast.makeText(context, "Digite as credencias de login.", Toast.LENGTH_SHORT).show()
+                }else{
+                navController.navigate("DesafioScreen")
+                }}){
+                    Text(text = "Entrar")
+                                                  }
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Button(onClick = { navController.navigate("CadastroScreen") }) {

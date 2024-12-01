@@ -14,7 +14,7 @@ data class GeminiResponse(val imageUrl: String)
 
 interface GeminiApi {
     @Headers("Authorization: Bearer AIzaSyD5dLGUjWWuhWHDJ058Hsx4QvueOtHBS6w", "Content-Type: application/json")
-    @POST("v1beta/models/gemini-1.5-flash-latest:generateContent")
+    @POST("v1beta/models/gemini-1.5-flash-latest:generateContent?key=YOUR_API_KEY")
     fun generateImage(@Body request: GeminiRequest): Call<GeminiResponse>
 
 }

@@ -15,11 +15,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.loginscreenv3.ui.theme.LoginScreenV3Theme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.tasks.await
 
 
 class MainActivity : ComponentActivity() {
@@ -57,15 +63,19 @@ fun MyApp() {
             }
 
             composable("DesafioScreen") {
-                DesafioScreen(navController = navController) // Tela de desafios
+                DesafioScreen(navController = navController)
             }
 
             composable("DisplayAvatarScreen") {
                 DisplayAvatarScreen(navController = navController)
             }
 
-            composable("Teste") {
-                Teste(navController = navController)
+            composable(
+                "teste/{missaoId}", // Define corretamente o formato da rota com o parâmetro
+                arguments = listOf(navArgument("missaoId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val missaoId = backStackEntry.arguments?.getString("missaoId")
+                Teste(navController = navController, missaoId = missaoId) // Passa o parâmetro para a tela
             }
 
             composable("Postagens") {
@@ -87,7 +97,19 @@ fun MyApp() {
     }
 }
 
-
+@Composable
+fun AppNavigation(navController: NavHostController) {
+    NavHost(navController, startDestination = "missaoScreen") {
+        composable("missaoScreen") { DesafioScreen(navController) }
+        composable(
+            "teste/{missaoId}",
+            arguments = listOf(navArgument("missaoId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val missaoId = backStackEntry.arguments?.getString("missaoId")
+            Teste(navController, missaoId)
+        }
+    }
+}
 @Composable
 fun BottomBar(navController: NavController) {
     NavigationBar {

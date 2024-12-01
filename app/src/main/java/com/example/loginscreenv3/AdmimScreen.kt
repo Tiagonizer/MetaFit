@@ -8,12 +8,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role.Companion.Switch
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -30,7 +33,8 @@ fun AdmimScreen(navController: NavController) {
     var ordemMissao by remember { mutableStateOf("") }
     var missoes by remember { mutableStateOf(listOf<Pair<String, Map<String, Any>>>()) }
     var selectedMissionId by remember { mutableStateOf<String?>(null) }
-
+    var ativo by remember { mutableStateOf(true) }
+    var completa by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val firestore = FirebaseFirestore.getInstance()
 
@@ -105,6 +109,45 @@ fun AdmimScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Campo de seleção Ativo/Bloqueado
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Switch(
+                    checked = ativo,
+                    onCheckedChange = { ativo = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.Green,
+                        uncheckedThumbColor = Color.Red
+                    )
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Text(text = "Status: ", fontSize = 16.sp, modifier = Modifier.padding(end = 8.dp))
+                Text(
+                    text = if (ativo) "Ativo" else "Bloqueado",
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Switch para "Missão Completa"
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(
+                    checked = completa,
+                    onCheckedChange = { completa = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.Blue,
+                        uncheckedThumbColor = Color.Gray
+                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Missão Completa: ${if (completa) "Sim" else "Não"}")
+            }
+
             // Botão Salvar Missão
             Button(
                 onClick = {
@@ -112,7 +155,9 @@ fun AdmimScreen(navController: NavController) {
                         val missao = hashMapOf(
                             "titulo" to tituloMissao,
                             "descricao" to descricaoMissao,
-                            "ordem" to ordemMissao.toInt() // Converte ordem para inteiro
+                            "ordem" to ordemMissao.toInt(),
+                            "ativo" to ativo, // Adiciona o status no Firebase
+                            "completa" to completa
                         )
 
                         firestore.collection("missoes")
@@ -126,6 +171,7 @@ fun AdmimScreen(navController: NavController) {
                                 tituloMissao = ""
                                 descricaoMissao = ""
                                 ordemMissao = ""
+                                ativo = true // Reseta o estado do switch
                                 showAddMissionOptions = false
                             }
                             .addOnFailureListener { e ->
@@ -144,10 +190,9 @@ fun AdmimScreen(navController: NavController) {
             ) {
                 Text("Salvar Missão")
             }
-        }
 
         Spacer(modifier = Modifier.height(24.dp))
-
+        }
         // Botão para Editar Missão
         Button(
             onClick = { showEditMissionOptions = !showEditMissionOptions },
@@ -213,7 +258,45 @@ fun AdmimScreen(navController: NavController) {
                     label = { Text("Ordem") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Switch(
+                        checked = ativo,
+                        onCheckedChange = { ativo = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.Green,
+                            uncheckedThumbColor = Color.Red
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(text = "Status: ", fontSize = 16.sp, modifier = Modifier.padding(end = 8.dp))
+                    Text(
+                        text = if (ativo) "Ativo" else "Bloqueado",
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = completa,
+                        onCheckedChange = { completa = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.Blue,
+                            uncheckedThumbColor = Color.Gray
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Missão Completa: ${if (completa) "Sim" else "Não"}")
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Botão para salvar alterações
                 Button(
@@ -222,7 +305,8 @@ fun AdmimScreen(navController: NavController) {
                             val updatedMission = hashMapOf(
                                 "titulo" to tituloMissao,
                                 "descricao" to descricaoMissao,
-                                "ordem" to ordemMissao.toInt()
+                                "ordem" to ordemMissao.toInt(),
+                                "ativo" to ativo
                             )
                             selectedMissionId?.let { id ->
                                 firestore.collection("missoes").document(id)
@@ -332,6 +416,6 @@ fun AdmimScreen(navController: NavController) {
             ) {
                 Text("Excluir Missão Selecionada")
             }
-        }
     }
+}
 }

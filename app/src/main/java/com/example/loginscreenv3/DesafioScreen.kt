@@ -1,11 +1,13 @@
 package com.example.loginscreenv3
 
 import android.util.Log
+import android.widget.Toast
 import retrofit2.Call
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,9 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
@@ -29,51 +34,63 @@ import retrofit2.Response
 
 
 @Composable
-fun DesafioScreen(navController: NavHostController) {
-    var missoes by remember { mutableStateOf<List<Missao>>(emptyList()) }
+fun DesafioScreen(navController: NavController) {
+    val context = LocalContext.current
+    var missoes by remember { mutableStateOf(listOf<Pair<String, Map<String, Any>>>()) }
+    var missaoAtual by remember { mutableStateOf(0) } // Define a missão desbloqueada
+    val firestore = FirebaseFirestore.getInstance()
 
-    // Carregar missões ao inicializar
+    // Busca missões ordenadas pela ordem
     LaunchedEffect(Unit) {
-        carregarMissoes { missaoList ->
-            missoes = missaoList
-
-            // Atualiza a URL da imagem de cada missão
-            missaoList.forEach { missao ->
-                fetchGeminiImage(missao) { imageUrl ->
-                    // Atualiza a lista de missões ao receber a URL
-                    missoes = missoes.map {
-                        if (it == missao) it.copy(imageUrl = imageUrl) else it
-                    }
-                }
+        firestore.collection("missoes")
+            .orderBy("ordem", Query.Direction.ASCENDING)
+            .get()
+            .addOnSuccessListener { documents ->
+                val fetchedMissions = documents.map { doc -> doc.id to doc.data }
+                missoes = fetchedMissions
             }
-        }
+            .addOnFailureListener { e ->
+                Toast.makeText(
+                    context,
+                    "Erro ao carregar missões: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
     }
 
-    Scaffold { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Missões",
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.padding(16.dp)
-            )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Missões", fontSize = 30.sp)
 
-            if (missoes.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(16.dp)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            itemsIndexed(missoes) { index, (id, missionData) ->
+                val titulo = missionData["titulo"] as? String ?: "Missão"
+                val ordem = missionData["ordem"] as? Int ?: 0
+
+                Button(
+                    onClick = {
+                        if (index <= missaoAtual) {
+                            navController.navigate("teste/${id}") // Passa o ID da missão
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Complete as missões anteriores para desbloquear esta.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    enabled = index <= missaoAtual, // Bloqueia missões futuras
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(missoes) { missao ->
-                        MissaoCard(missao)
-                    }
+                    Text(text = "$ordem - $titulo")
                 }
             }
         }
@@ -88,38 +105,27 @@ fun MissaoCard(missao: Missao) {
             .padding(8.dp),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .padding(16.dp)
                 .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Text(
+                text = missao.titulo,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Imagem estática substituindo a funcionalidade de imagens dinâmicas
             Image(
-                painter = rememberAsyncImagePainter(
-                    model = missao.imageUrl.ifEmpty { "https://example.com/placeholder.png" },
-                    placeholder = painterResource(R.drawable.icon_maca),
-                    error = painterResource(R.drawable.icon_agua)
-                ),
+                painter = painterResource(R.drawable.icon_maca), // Use um ícone estático
                 contentDescription = "Imagem da Missão",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(50.dp)
                     .clip(CircleShape)
             )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column {
-                Text(
-                    text = missao.titulo,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = missao.descricao,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
         }
     }
 }
@@ -129,7 +135,6 @@ data class Missao(
     val titulo: String = "",
     val descricao: String = "",
     val ordem: Int = 0,
-    var imageUrl: String = "",
     var desbloqueada: Boolean = false, // Indica se a missão está desbloqueada
     var concluida: Boolean = false // Indica se a missão foi concluída
 )
@@ -158,26 +163,6 @@ fun carregarMissoes(onDataLoaded: (List<Missao>) -> Unit) {
         .addOnFailureListener { exception ->
             Log.e("Firestore", "Erro ao carregar missões: ${exception.localizedMessage}")
         }
-}
-
-// Função para buscar a URL da imagem da API Gemini
-private fun fetchGeminiImage(missao: Missao, onImageFetched: (String) -> Unit) {
-    val request = GeminiRequest(prompt = missao.titulo)
-    RetrofitInstance.api.generateImage(request).enqueue(object : Callback<GeminiResponse> {
-        override fun onResponse(call: Call<GeminiResponse>, response: Response<GeminiResponse>) {
-            if (response.isSuccessful) {
-                response.body()?.imageUrl?.let { url ->
-                    onImageFetched(url) // Atualiza o estado ao receber a URL
-                }
-            } else {
-                Log.e("GeminiAPI", "Erro na resposta da API: ${response.errorBody()?.string()}")
-            }
-        }
-
-        override fun onFailure(call: Call<GeminiResponse>, t: Throwable) {
-            Log.e("GeminiAPI", "Erro ao buscar imagem: ${t.localizedMessage}")
-        }
-    })
 }
 
 @Preview(showBackground = true)
