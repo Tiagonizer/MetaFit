@@ -60,7 +60,7 @@ fun DisplayAvatarScreen(navController: NavController) {
         ) {
             avatarList.chunked(3).forEach { row ->
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -112,4 +112,3 @@ fun DisplayAvatarScreen(navController: NavController) {
         }
     }
 }
-

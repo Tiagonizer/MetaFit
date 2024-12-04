@@ -37,24 +37,27 @@ import retrofit2.Response
 fun DesafioScreen(navController: NavController) {
     val context = LocalContext.current
     var missoes by remember { mutableStateOf(listOf<Pair<String, Map<String, Any>>>()) }
-    var missaoAtual by remember { mutableStateOf(0) } // Define a missão desbloqueada
+    var ofensivas by remember { mutableStateOf(0) } // Contador de missões concluídas
     val firestore = FirebaseFirestore.getInstance()
 
     // Busca missões ordenadas pela ordem
     LaunchedEffect(Unit) {
         firestore.collection("missoes")
-            .orderBy("ordem", Query.Direction.ASCENDING)
-            .get()
-            .addOnSuccessListener { documents ->
-                val fetchedMissions = documents.map { doc -> doc.id to doc.data }
-                missoes = fetchedMissions
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(
-                    context,
-                    "Erro ao carregar missões: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+            .orderBy("ordem", Query.Direction.ASCENDING) // Ordenação crescente
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Toast.makeText(context, "Erro ao carregar missões: ${e.message}", Toast.LENGTH_SHORT).show()
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && !snapshot.isEmpty) {
+                    val fetchedMissions = snapshot.documents.map { doc ->
+                        doc.id to doc.data!!
+                    }
+                    missoes = fetchedMissions
+                    // Atualiza o contador de missões concluídas
+                    ofensivas = fetchedMissions.count { it.second["completa"] as? Boolean == true }
+                }
             }
     }
 
@@ -65,8 +68,19 @@ fun DesafioScreen(navController: NavController) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Título
         Text("Missões", fontSize = 30.sp)
 
+        // Contador de missões concluídas
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Ofensivas:", fontSize = 18.sp)
+            Text("$ofensivas", fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+        }
+
+        // Lista de missões
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -74,96 +88,43 @@ fun DesafioScreen(navController: NavController) {
             itemsIndexed(missoes) { index, (id, missionData) ->
                 val titulo = missionData["titulo"] as? String ?: "Missão"
                 val ordem = missionData["ordem"] as? Int ?: 0
+                val completa = missionData["completa"] as? Boolean ?: false
+                val desbloqueada = index == 0 || (missoes.getOrNull(index - 1)?.second?.get("completa") as? Boolean == true)
 
                 Button(
                     onClick = {
-                        if (index <= missaoAtual) {
-                            navController.navigate("teste/${id}") // Passa o ID da missão
+                        if (desbloqueada) {
+                            navController.navigate("teste/$id") // Passa o ID da missão
                         } else {
                             Toast.makeText(
                                 context,
-                                "Complete as missões anteriores para desbloquear esta.",
+                                "Complete a missão anterior para desbloquear esta.",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
                     },
-                    enabled = index <= missaoAtual, // Bloqueia missões futuras
+                    enabled = desbloqueada, // Bloqueia o botão se a missão não estiver desbloqueada
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "$ordem - $titulo")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("$ordem - $titulo")
+                        if (completa) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.icon_concluido), // Substitua pelo seu ícone
+                                contentDescription = "Missão concluída",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-@Composable
-fun MissaoCard(missao: Missao) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = missao.titulo,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Imagem estática substituindo a funcionalidade de imagens dinâmicas
-            Image(
-                painter = painterResource(R.drawable.icon_maca), // Use um ícone estático
-                contentDescription = "Imagem da Missão",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(CircleShape)
-            )
-        }
-    }
-}
-
-// Modelo de dados da missão
-data class Missao(
-    val titulo: String = "",
-    val descricao: String = "",
-    val ordem: Int = 0,
-    var desbloqueada: Boolean = false, // Indica se a missão está desbloqueada
-    var concluida: Boolean = false // Indica se a missão foi concluída
-)
-
-// Função para carregar missões do Firestore
-fun carregarMissoes(onDataLoaded: (List<Missao>) -> Unit) {
-    val db = FirebaseFirestore.getInstance()
-    db.collection("missoes")
-        .orderBy("ordem", Query.Direction.ASCENDING)
-        .get()
-        .addOnSuccessListener { result ->
-            val missaoList = result.mapIndexed { index, document ->
-                val titulo = document.getString("titulo") ?: ""
-                val descricao = document.getString("descricao") ?: ""
-                val ordem = document.getLong("ordem")?.toInt() ?: 0
-                Missao(
-                    titulo = titulo,
-                    descricao = descricao,
-                    ordem = ordem,
-                    desbloqueada = index == 0 // Apenas a primeira missão é desbloqueada inicialmente
-                )
-            }
-
-            onDataLoaded(missaoList)
-        }
-        .addOnFailureListener { exception ->
-            Log.e("Firestore", "Erro ao carregar missões: ${exception.localizedMessage}")
-        }
-}
 
 @Preview(showBackground = true)
 @Composable

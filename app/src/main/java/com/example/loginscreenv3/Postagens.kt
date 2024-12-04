@@ -1,110 +1,131 @@
 package com.example.loginscreenv3
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
-import com.example.loginscreenv3.ui.theme.LoginScreenV3Theme
+import coil.compose.rememberAsyncImagePainter
+import java.io.File
 
 @Composable
 fun Postagens(navController: NavHostController) {
-    // Removendo o estado de selectedItem, já que não estamos mais utilizando a BottomBar
-    LoginScreenV3Theme {
-        Scaffold(
-            // Remover a BottomBar
-            // bottomBar = { ... }
-        ) { paddingValues ->
-            PostagensScreenContent(modifier = Modifier.padding(paddingValues))
-        }
+    Scaffold { paddingValues ->
+        PostagensScreenContent(modifier = Modifier.padding(paddingValues))
+    }
+}
+
+fun loadPhotoMetadata(context: Context): List<Pair<String, String>> {
+    val sharedPreferences = context.getSharedPreferences("Postagens", Context.MODE_PRIVATE)
+    val savedData = sharedPreferences.getStringSet("photoData", emptySet()) ?: emptySet()
+    return savedData.mapNotNull { data ->
+        val parts = data.split("|")
+        if (parts.size == 2) {
+            val filePath = parts[0]
+            if (File(filePath).exists()) Pair(filePath, parts[1]) else null
+        } else null
     }
 }
 
 @Composable
 fun PostagensScreenContent(modifier: Modifier = Modifier) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        items(10) {
-            PostagemItem()
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+    val context = LocalContext.current
+    val photoMetadata = remember { mutableStateOf(emptyList<Pair<String, String>>()) }
+
+    LaunchedEffect(Unit) {
+        photoMetadata.value = loadPhotoMetadata(context)
     }
-}
 
-@Composable
-fun PostagemItem() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+    if (photoMetadata.value.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.avatar1),
-                contentDescription = "Foto do Usuário",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(50.dp)
-                    .background(Color.Gray, CircleShape)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-
             Text(
-                text = "Nome do Usuário",
+                text = "Nenhuma postagem encontrada",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Image(
-            painter = painterResource(id = R.drawable.post_image_1),
-            contentDescription = "Imagem da Postagem",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Postado há 1 hora",
-            fontSize = 14.sp,
-            color = Color.Gray,
-            modifier = Modifier.align(Alignment.End)
-        )
+    } else {
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            items(items = photoMetadata.value) { (filePath, timestamp) ->
+                PostagemItem(photoPath = filePath, timestamp = timestamp)
+            }
+        }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun PostagensScreenPreview() {
-    val navController = rememberNavController()
-    Postagens(navController = navController)
+fun PostagemItem(photoPath: String, timestamp: String) {
+    val context = LocalContext.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight(),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Exibe a imagem
+            if (File(photoPath).exists()) {
+                Image(
+                    painter = rememberAsyncImagePainter(model = Uri.parse(photoPath)),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Exibe o timestamp
+            Text(
+                text = "Feito na data: $timestamp",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Botão de compartilhar
+            Button(
+                onClick = {
+                    compartilharPost(context, photoPath, timestamp)
+                },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(text = "Compartilhar")
+            }
+        }
+    }
+}
+
+fun compartilharPost(context: Context, photoPath: String, timestamp: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/*"
+        putExtra(Intent.EXTRA_STREAM, Uri.parse(photoPath))
+        putExtra(Intent.EXTRA_TEXT, "Confira esta postagem que fiz em $timestamp!")
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartilhar postagem via:"))
 }

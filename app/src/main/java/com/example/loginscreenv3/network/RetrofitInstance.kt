@@ -4,7 +4,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitInstance {
-    private const val BASE_URL = "https://generativelanguage.googleapis.com" // Substitua pelo endpoint real.
+    private const val BASE_URL = "https://generativelanguage.googleapis.com"
 
     val api: GeminiApi by lazy {
         Retrofit.Builder()

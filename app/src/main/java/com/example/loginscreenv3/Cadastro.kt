@@ -222,88 +222,88 @@ fun CadastroScreen(navController: NavController) {
                     if (senhaTextField != senhaConfirmTextField) {
                         mensagem = false
                         scope.launch(Dispatchers.Main) {
-                        Toast.makeText(
-                            context, "As senhas não são iguais.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context, "As senhas não são iguais.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else if (emailTextField.isBlank()) {
                         mensagem = false
                         scope.launch(Dispatchers.Main) {
-                        Toast.makeText(
-                            context, "E-mail precisa estar preenchido.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context, "E-mail precisa estar preenchido.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else if (senhaTextField.isBlank()) {
                         mensagem = false
                         scope.launch(Dispatchers.Main){
-                        Toast.makeText(
-                            context, "Senha precisa estar preenchido.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context, "Senha precisa estar preenchido.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else if (primeiroNomeTextField.isBlank()) {
                         mensagem = false
                         scope.launch(Dispatchers.Main){
-                        Toast.makeText(
-                            context,
-                            "Primeiro nome precisa estar preenchido.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context,
+                                "Primeiro nome precisa estar preenchido.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else if (ultimoNomeTextField.isBlank()) {
                         mensagem = false
                         scope.launch(Dispatchers.Main){
-                        Toast.makeText(
-                            context, "Ultimo nome precisa estar preenchido.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context, "Ultimo nome precisa estar preenchido.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else if (alturaTextField.isBlank()) {
                         mensagem = false
                         scope.launch(Dispatchers.Main){
-                        Toast.makeText(
-                            context, "Altura precisa estar preechido.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context, "Altura precisa estar preechido.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else if (pesoTextField.isBlank()) {
                         mensagem = false
                         scope.launch(Dispatchers.Main){
-                        Toast.makeText(
-                            context, "Peso precisa estar preenchido.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context, "Peso precisa estar preenchido.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else if (idadeTextField.isBlank()) {
                         mensagem = false
                         scope.launch(Dispatchers.Main){
-                        Toast.makeText(
-                            context, "Idade precisa estar preechido.", Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.makeText(
+                                context, "Idade precisa estar preechido.", Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }
                 }
 
                 scope.launch(Dispatchers.Main) {
 
-                if (mensagem) {
+                    if (mensagem) {
 
-                    usuario.validaUsuario(emailTextField, "")
-                        .addOnCompleteListener() { querySnapshot ->
-                            val emailValidacao = querySnapshot.result.data
+                        usuario.validaUsuario(emailTextField, "")
+                            .addOnCompleteListener() { querySnapshot ->
+                                val emailValidacao = querySnapshot.result.data
 
-                            if (emailValidacao != null) {
+                                if (emailValidacao != null) {
+                                    Toast.makeText(
+                                        context, "Email já existe", Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@addOnCompleteListener
+                                }
+
+                                usuario.cadastraUsuario()
                                 Toast.makeText(
-                                    context, "Email já existe", Toast.LENGTH_SHORT
+                                    context, "Cadastrado com sucesso.", Toast.LENGTH_SHORT
                                 ).show()
-                                return@addOnCompleteListener
+                                navController.navigate("DisplayAvatarScreen")
                             }
-
-                            usuario.cadastraUsuario()
-                            Toast.makeText(
-                                context, "Cadastrado com sucesso.", Toast.LENGTH_SHORT
-                            ).show()
-                            navController.navigate("DisplayAvatarScreen")
-                        }
                     }
                 }
             })
-            { Text("Cadastrar") }
+            {Text("Cadastrar") }
         }
     }
 }
