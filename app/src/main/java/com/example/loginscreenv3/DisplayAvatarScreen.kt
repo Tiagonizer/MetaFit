@@ -1,5 +1,6 @@
 package com.example.loginscreenv3
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,21 +14,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
-@Preview(showBackground = true)
-@Composable
-fun PreviewDisplayAvatarScreen() {
-    DisplayAvatarScreen(navController = rememberNavController())
-}
+
 
 @Composable
-fun DisplayAvatarScreen(navController: NavController) {
-    // Definindo os avatares a partir dos recursos de drawable
+fun DisplayAvatarScreen(navController: NavController, email: String?) {
     val avatar1 = R.drawable.avatar1
     val avatar2 = R.drawable.avatar2
     val avatar3 = R.drawable.avatar3
@@ -35,13 +35,16 @@ fun DisplayAvatarScreen(navController: NavController) {
     val avatar5 = R.drawable.avatar5
     val avatar6 = R.drawable.avatar6
 
-    // Lista de avatares
-    val avatarList = listOf(avatar1, avatar2, avatar3, avatar4, avatar5, avatar6)
+    val avatarList = listOf(
+        avatar1 to "avatar1.png", avatar2 to "avatar2.png",
+        avatar3 to "avatar3.png", avatar4 to "avatar4.png",
+        avatar5 to "avatar5.png", avatar6 to "avatar6.png"
+    )
 
-    // Estado para controlar o avatar selecionado
-    var selectedAvatar by remember { mutableStateOf<Int?>(null) }
+    var selectedAvatar by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    // Layout da tela
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -51,10 +54,8 @@ fun DisplayAvatarScreen(navController: NavController) {
     ) {
         Text(text = "Escolha seu Avatar", modifier = Modifier.padding(16.dp))
 
-        // Exibição dos avatares em uma grid 3x2
         Column(
-            modifier = Modifier
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -64,7 +65,7 @@ fun DisplayAvatarScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    row.forEach { avatarId ->
+                    row.forEach { (avatarId, avatarName) ->
                         Image(
                             painter = painterResource(id = avatarId),
                             contentDescription = "Avatar",
@@ -72,12 +73,12 @@ fun DisplayAvatarScreen(navController: NavController) {
                                 .size(100.dp)
                                 .clip(CircleShape)
                                 .border(
-                                    width = if (avatarId == selectedAvatar) 4.dp else 0.dp,
-                                    color = if (avatarId == selectedAvatar) Color.Blue else Color.Transparent,
+                                    width = if (avatarId == selectedAvatar?.first) 4.dp else 0.dp,
+                                    color = if (avatarId == selectedAvatar?.first) Color.Blue else Color.Transparent,
                                     shape = CircleShape
                                 )
                                 .clickable {
-                                    selectedAvatar = avatarId
+                                    selectedAvatar = avatarId to avatarName
                                 },
                             contentScale = ContentScale.Crop
                         )
@@ -88,27 +89,50 @@ fun DisplayAvatarScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Botão de selecionar avatar
         Button(
             onClick = {
-                // Voltar à tela inicial, ignorando o avatar selecionado
-                navController.navigate("Login")
+                selectedAvatar?.let { (_, avatarName) ->
+                    scope.launch(Dispatchers.IO) {
+                        val db = FirebaseFirestore.getInstance()
+
+                        if (!email.isNullOrBlank()) {
+                            db.collection("Logins")
+                                .document(email)
+                                .update("avatar", avatarName)
+                                .addOnSuccessListener {
+                                    scope.launch(Dispatchers.Main) {
+                                        Toast.makeText(
+                                            context,
+                                            "Avatar salvo com sucesso!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        navController.navigate("Login")
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    scope.launch(Dispatchers.Main) {
+                                        Toast.makeText(
+                                            context,
+                                            "Erro ao salvar avatar: ${e.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                        } else {
+                            scope.launch(Dispatchers.Main) {
+                                Toast.makeText(
+                                    context,
+                                    "Erro: E-mail inválido!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                }
             },
             enabled = selectedAvatar != null
         ) {
             Text(text = "Selecionar Avatar")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Botão de continuar sem selecionar avatar
-        Button(
-            onClick = {
-                // Voltar para a tela inicial, sem avatar
-                navController.navigate("Login")
-            }
-        ) {
-            Text(text = "Continuar sem Avatar")
         }
     }
 }

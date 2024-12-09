@@ -25,18 +25,54 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Base64
 import android.util.Log
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.firestore.Query
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import android.graphics.Matrix
+import android.media.ExifInterface
+
+fun saveImageToPostagem(
+    firestore: FirebaseFirestore,
+    missionId: String?,
+    imageBase64: String,
+    tituloMissao: String,
+    apelidoUsuario: String,
+    avatarUsuario: String,
+    onComplete: (Boolean) -> Unit
+) {
+    val postagemData = hashMapOf(
+        "missaoId" to missionId,
+        "imageBase64" to imageBase64,
+        "data" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
+        "tituloMissao" to tituloMissao,
+        "apelido" to apelidoUsuario,
+        "avatar" to avatarUsuario
+    )
+
+    firestore.collection("postagem")
+        .add(postagemData)
+        .addOnSuccessListener { onComplete(true) }
+        .addOnFailureListener { e ->
+            Log.e("Firebase", "Erro ao salvar postagem: ${e.message}")
+            onComplete(false)
+        }
+}
 
 @Composable
 fun Teste(navController: NavHostController, missaoId: String?) {
     var titulo by remember { mutableStateOf("Carregando...") }
     var descricao by remember { mutableStateOf("") }
-    var ativa by remember { mutableStateOf(false) } // Indica se a missão está ativa
+    var ativa by remember { mutableStateOf(false) }
+    var apelidoUsuario by remember { mutableStateOf("") }
+    var avatarUsuario by remember { mutableStateOf("") }
+
     val firestore = FirebaseFirestore.getInstance()
     val context = LocalContext.current
 
@@ -48,42 +84,47 @@ fun Teste(navController: NavHostController, missaoId: String?) {
         photoFile
     )
 
-    // Lançadores para câmera e permissão
+    // Lançador de câmera
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val filePath = photoFile.absolutePath
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
 
-            savePhotoMetadata(context, filePath, timeStamp)
-
-            missaoId?.let {
-                updateMissionStatus(firestore, it) { success ->
+            // Compacta e converte a imagem para Base64
+            val imageBase64 = compressImage(filePath)
+            if (imageBase64 != null) {
+                // Salva a imagem na coleção "postagem"
+                saveImageToPostagem(
+                    firestore,
+                    missaoId,
+                    imageBase64,
+                    titulo, // Garantir que o título seja passado corretamente
+                    apelidoUsuario,
+                    avatarUsuario
+                ) { success ->
                     if (success) {
-                        Toast.makeText(context, "Missão concluída!", Toast.LENGTH_SHORT).show()
-                        navController.popBackStack()
-                        navController.navigate("DesafioScreen")
+                        // Atualiza o status da missão
+                        missaoId?.let {
+                            updateMissionStatus(firestore, it) { missionUpdated ->
+                                if (missionUpdated) {
+                                    Toast.makeText(context, "Missão concluída!", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                    navController.navigate("DesafioScreen")
+                                } else {
+                                    Toast.makeText(context, "Erro ao atualizar missão.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     } else {
-                        Toast.makeText(context, "Erro ao atualizar missão.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Erro ao salvar postagem.", Toast.LENGTH_SHORT).show()
                     }
                 }
+            } else {
+                Toast.makeText(context, "Erro ao processar imagem.", Toast.LENGTH_SHORT).show()
             }
         } else {
             Toast.makeText(context, "Foto não capturada.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
-            }
-            cameraLauncher.launch(cameraIntent)
-        } else {
-            Toast.makeText(context, "Permissão de câmera necessária.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -94,6 +135,11 @@ fun Teste(navController: NavHostController, missaoId: String?) {
                 titulo = doc.getString("titulo") ?: "Missão"
                 descricao = doc.getString("descricao") ?: "Sem descrição"
                 ativa = doc.getBoolean("ativo") ?: false
+
+                // Recupera apelido e avatar do usuário
+                val userDoc = firestore.collection("usuarios").document("usuarioLogadoId").get().await()
+                apelidoUsuario = userDoc.getString("apelido") ?: "Usuário"
+                avatarUsuario = userDoc.getString("avatar") ?: ""
             } catch (e: Exception) {
                 Log.e("Firebase", "Erro ao carregar missão: ${e.message}")
                 titulo = "Erro ao carregar missão"
@@ -128,19 +174,15 @@ fun Teste(navController: NavHostController, missaoId: String?) {
         Button(
             onClick = {
                 if (ativa) {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                        val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                            putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
-                        }
-                        cameraLauncher.launch(cameraIntent)
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                        putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
                     }
+                    cameraLauncher.launch(cameraIntent)
                 } else {
                     Toast.makeText(context, "Missão bloqueada. Complete as anteriores!", Toast.LENGTH_SHORT).show()
                 }
             },
-            enabled = ativa, // Botão habilitado apenas se a missão estiver ativa
+            enabled = ativa,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(text = "Concluir Missão")
@@ -148,31 +190,57 @@ fun Teste(navController: NavHostController, missaoId: String?) {
     }
 }
 
-// Funções auxiliares (mantidas as mesmas)
-fun savePhotoMetadata(context: Context, filePath: String, timestamp: String) {
-    val sharedPreferences = context.getSharedPreferences("Postagens", Context.MODE_PRIVATE)
-    val editor = sharedPreferences.edit()
-    val existingData = sharedPreferences.getStringSet("photoData", mutableSetOf()) ?: mutableSetOf()
-    existingData.add("$filePath|$timestamp")
-    editor.putStringSet("photoData", existingData)
-    editor.apply()
+fun adjustImageOrientation(filePath: String, bitmap: Bitmap): Bitmap {
+    val exif = ExifInterface(filePath)
+    val orientation = exif.getAttributeInt(
+        ExifInterface.TAG_ORIENTATION,
+        ExifInterface.ORIENTATION_UNDEFINED
+    )
+
+    val matrix = Matrix()
+    when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+        ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+    }
+
+    return Bitmap.createBitmap(
+        bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+    )
 }
 
+// Funções auxiliares
 fun createImageFile(context: Context): File {
     val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
     return File.createTempFile("JPEG_${System.currentTimeMillis()}_", ".jpg", storageDir)
 }
+
+fun compressImage(filePath: String): String? {
+    val originalBitmap = BitmapFactory.decodeFile(filePath) ?: return null
+
+    // Ajustar orientação
+    val correctedBitmap = adjustImageOrientation(filePath, originalBitmap)
+
+    // Reduzindo tamanho e qualidade
+    val resizedBitmap = Bitmap.createScaledBitmap(correctedBitmap, 800, 800, true) // Reduz resolução
+    val outputStream = ByteArrayOutputStream()
+    resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 50, outputStream) // Compactação JPEG
+
+    val byteArray = outputStream.toByteArray()
+    return Base64.encodeToString(byteArray, Base64.DEFAULT) // Converte para Base64
+}
+
 
 fun updateMissionStatus(
     firestore: FirebaseFirestore,
     missionId: String,
     onComplete: (Boolean) -> Unit
 ) {
-    // Atualiza a missão atual para "completa"
     firestore.collection("missoes").document(missionId)
         .update("completa", true)
         .addOnSuccessListener {
-            // Desbloqueia a próxima missão
             firestore.collection("missoes")
                 .orderBy("ordem", Query.Direction.ASCENDING)
                 .get()
@@ -184,9 +252,7 @@ fun updateMissionStatus(
                         val nextMission = missoes[currentMissionIndex + 1]
                         firestore.collection("missoes").document(nextMission.id)
                             .update("ativo", true)
-                            .addOnSuccessListener {
-                                onComplete(true)
-                            }
+                            .addOnSuccessListener { onComplete(true) }
                             .addOnFailureListener { e ->
                                 Log.e("Firebase", "Erro ao desbloquear próxima missão: ${e.message}")
                                 onComplete(false)
@@ -205,5 +271,3 @@ fun updateMissionStatus(
             onComplete(false)
         }
 }
-
-

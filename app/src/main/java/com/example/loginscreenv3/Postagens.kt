@@ -18,7 +18,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import java.io.File
+import android.util.Base64
+import android.util.Log
+import androidx.compose.ui.graphics.graphicsLayer
+import java.io.FileOutputStream
 
 @Composable
 fun Postagens(navController: NavHostController) {
@@ -27,28 +33,41 @@ fun Postagens(navController: NavHostController) {
     }
 }
 
-fun loadPhotoMetadata(context: Context): List<Pair<String, String>> {
-    val sharedPreferences = context.getSharedPreferences("Postagens", Context.MODE_PRIVATE)
-    val savedData = sharedPreferences.getStringSet("photoData", emptySet()) ?: emptySet()
-    return savedData.mapNotNull { data ->
-        val parts = data.split("|")
-        if (parts.size == 2) {
-            val filePath = parts[0]
-            if (File(filePath).exists()) Pair(filePath, parts[1]) else null
-        } else null
+suspend fun fetchPostagens(context: Context): List<Pair<Uri, String>> {
+    val firestore = FirebaseFirestore.getInstance()
+    val postagens = mutableListOf<Pair<Uri, String>>()
+
+    try {
+        val result = firestore.collection("postagem").get().await()
+        for (document in result) {
+            val imageBase64 = document.getString("imageBase64") ?: continue
+            val timestamp = document.getString("data") ?: "Data desconhecida"
+
+            // Decodifica a imagem Base64 e salva como arquivo local
+            val imageData = Base64.decode(imageBase64, Base64.DEFAULT)
+            val file = File(context.cacheDir, "${document.id}.jpg")
+            FileOutputStream(file).use { it.write(imageData) }
+
+            val uri = Uri.fromFile(file)
+            postagens.add(uri to timestamp)
+        }
+    } catch (e: Exception) {
+        Log.e("Firebase", "Erro ao buscar postagens: ${e.message}")
     }
+
+    return postagens
 }
 
 @Composable
 fun PostagensScreenContent(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val photoMetadata = remember { mutableStateOf(emptyList<Pair<String, String>>()) }
+    val postagens = remember { mutableStateOf(emptyList<Pair<Uri, String>>()) }
 
     LaunchedEffect(Unit) {
-        photoMetadata.value = loadPhotoMetadata(context)
+        postagens.value = fetchPostagens(context)
     }
 
-    if (photoMetadata.value.isEmpty()) {
+    if (postagens.value.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -65,15 +84,15 @@ fun PostagensScreenContent(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            items(items = photoMetadata.value) { (filePath, timestamp) ->
-                PostagemItem(photoPath = filePath, timestamp = timestamp)
+            items(items = postagens.value) { (uri, timestamp) ->
+                PostagemItem(photoUri = uri, timestamp = timestamp)
             }
         }
     }
 }
 
 @Composable
-fun PostagemItem(photoPath: String, timestamp: String) {
+fun PostagemItem(photoUri: Uri, timestamp: String) {
     val context = LocalContext.current
 
     Card(
@@ -85,17 +104,15 @@ fun PostagemItem(photoPath: String, timestamp: String) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Exibe a imagem
-            if (File(photoPath).exists()) {
-                Image(
-                    painter = rememberAsyncImagePainter(model = Uri.parse(photoPath)),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                )
-            }
+            // Exibe a imagem com ajuste de rotação e proporção
+            Image(
+                painter = rememberAsyncImagePainter(model = photoUri),
+                contentDescription = null,
+                contentScale = ContentScale.Fit, // Ajusta para manter a proporção original
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f) // Mantém a imagem quadrada
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -111,7 +128,7 @@ fun PostagemItem(photoPath: String, timestamp: String) {
             // Botão de compartilhar
             Button(
                 onClick = {
-                    compartilharPost(context, photoPath, timestamp)
+                    compartilharPost(context, photoUri, timestamp)
                 },
                 modifier = Modifier.align(Alignment.End)
             ) {
@@ -121,10 +138,10 @@ fun PostagemItem(photoPath: String, timestamp: String) {
     }
 }
 
-fun compartilharPost(context: Context, photoPath: String, timestamp: String) {
+fun compartilharPost(context: Context, photoUri: Uri, timestamp: String) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "image/*"
-        putExtra(Intent.EXTRA_STREAM, Uri.parse(photoPath))
+        putExtra(Intent.EXTRA_STREAM, photoUri)
         putExtra(Intent.EXTRA_TEXT, "Confira esta postagem que fiz em $timestamp!")
     }
     context.startActivity(Intent.createChooser(intent, "Compartilhar postagem via:"))

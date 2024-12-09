@@ -102,7 +102,7 @@ fun LoginScreen(navController: NavController) {
                                                   }
                 Spacer(modifier = Modifier.width(16.dp))
 
-                Button(onClick = { navController.navigate("CadastroScreen") }) {
+                Button(onClick = { navController.navigate("Cadastro") }) {
                     Text(text = "Cadastrar-se")
                 }
             }

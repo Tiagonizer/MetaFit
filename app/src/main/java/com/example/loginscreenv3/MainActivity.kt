@@ -58,16 +58,20 @@ fun MyApp() {
                 LoginScreen(navController = navController)
             }
 
-            composable("CadastroScreen") {
-                CadastroScreen(navController = navController)
+            composable("Cadastro") {
+                Cadastro(navController = navController)
             }
 
             composable("DesafioScreen") {
                 DesafioScreen(navController = navController)
             }
 
-            composable("DisplayAvatarScreen") {
-                DisplayAvatarScreen(navController = navController)
+            composable(
+                "displayAvatarScreen/{email}",
+                arguments = listOf(navArgument("email") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val email = backStackEntry.arguments?.getString("email")
+                DisplayAvatarScreen(navController, email)
             }
 
             composable(

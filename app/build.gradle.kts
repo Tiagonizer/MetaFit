@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-    id("com.google.gms.google-services") // Adicione este plugin aqui
+    id("com.google.gms.google-services") // Plugin para Firebase
 }
 
 android {
@@ -51,8 +51,7 @@ android {
 }
 
 dependencies {
-
-    // Dependências gerais
+    // Dependências AndroidX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -66,12 +65,15 @@ dependencies {
     implementation(libs.androidx.navigation.compose.v280)
 
     // Firebase
-    implementation(platform(libs.firebase.bom)) // Declaração única do BOM
+    implementation(platform(libs.firebase.bom)) // BOM para gerenciamento de versões Firebase
     implementation(libs.firebase.auth)
     implementation(libs.firebase.common.ktx)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.storage.ktx)
+
+    // Compressor (para compactar imagens antes do upload)
+    implementation("id.zelory:compressor:3.0.1")
 
     // Testes
     testImplementation(libs.junit)
@@ -84,17 +86,20 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    //Retrofit para integração com Gemini
-    implementation ("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("io.coil-kt:coil-compose:2.2.2")
-    implementation("io.coil-kt:coil-compose:2.4.0") // Verifique a versão mais recente
-    
-    // 
-    implementation ("androidx.compose.runtime:runtime-livedata:1.4.3")
-    implementation ("androidx.lifecycle:lifecycle-runtime-compose:2.6.1")
-    implementation ("androidx.activity:activity-compose:1.7.2")
-    implementation ("com.squareup.okhttp3:okhttp:4.10.0")
-    implementation("androidx.compose.material3:material3:1.1.1")
+    // Retrofit para integração com APIs
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.10.0")
 
+    // Coil (para carregar imagens)
+    implementation("io.coil-kt:coil-compose:2.4.0")
+
+    // LiveData e ViewModel
+    implementation("androidx.compose.runtime:runtime-livedata:1.4.3")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.1")
+    implementation("androidx.activity:activity-compose:1.7.2")
+
+    // Material 3 (Compose)
+    implementation("androidx.compose.material3:material3:1.1.1")
+    implementation ("androidx.exifinterface:exifinterface:1.3.6")
 }
